@@ -20,11 +20,11 @@ ev3 = EV3Brick()
 lMotor = Motor(Port.B)
 rMotor = Motor(Port.C)
 
-# lSensor = ColorSensor(Port.S1)
-# rSensor = ColorSensor(Port.S4)
+lSensor = ColorSensor(Port.S1)
+rSensor = ColorSensor(Port.S4)
 
-lSensor = Ev3devSensor(Port.S1)
-rSensor = Ev3devSensor(Port.S4)
+# lSensor = Ev3devSensor(Port.S1)
+# rSensor = Ev3devSensor(Port.S4)
 
 # timer = StopWatch()
 # timer.pause()
