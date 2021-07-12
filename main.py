@@ -31,7 +31,7 @@ rSensor = ColorSensor(Port.S4)
 
 # Initialize your constants/variables here
 
-
+devOld, dev, iSum, u, lValue, rValue = 0, 0, 0, 0, 0, 0
 
 # Write your program here.
 
