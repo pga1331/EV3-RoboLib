@@ -8,9 +8,6 @@ from pybricks.robotics import DriveBase
 from pybricks.media.ev3dev import SoundFile, ImageFile
 from pybricks.iodevices import Ev3devSensor
 
-timer = StopWatch()
-timer.pause()
-
 lMotor = Motor(Port.B)
 rMotor = Motor(Port.C)
 
@@ -20,89 +17,200 @@ rSensor = ColorSensor(Port.S4)
 # lSensor = Ev3devSensor(Port.S1)
 # rSensor = Ev3devSensor(Port.S4)
 
-devOld, dev, iSum, u, lValue, rValue = 0, 0, 0, 0, 0, 0
-
-def readPercent(sensor, filterThreshold = 0, maxValue = 255):
+def read_percent(sensor, filter_threshold = 0, max_value = 255):
     value = 0
 
     if str(type(lSensor)) == "<class 'ColorSensor'>" and str(type(rSensor)) == "<class 'ColorSensor'>":
         value = sensor.reflection()
     elif str(type(sensor)) == "<class ''>":
-        value = round(sensor.read('RGB')[3] / maxValue * 100)
+        value = round(sensor.read('RGB')[3] / max_value * 100)
 
-    if filterThreshold == 0:
+    if filter_threshold == 0:
         return value
     else:
-        return value // filterThreshold * filterThreshold
+        return value // filter_threshold * filter_threshold
 
-def resetValues(devOld = devOld, dev = dev, u = u, iSum = iSum, lValue = lValue, rValue = rValue, lMotor = lMotor):
-    devOld, iSum, dev, u = 0, 0, 0, 0
-    lMotor.reset_angle(0)
-    lValue, rValue = readPercent(lSensor), readPercent(rSensor)
+def s_dev(l_value = read_percent(lSensor), r_value = read_percent(rSensor), delta = 0, filter_threshold = 0):
+    dev = l_value - r_value
 
-def sDev(lValue = readPercent(lSensor), rValue = readPercent(rSensor), delta = 0, filterThreshold = 0):
-    dev = lValue - rValue
-
-    if filterThreshold == 0:
+    if filter_threshold == 0:
         return dev + delta
     else:
-        return dev // filterThreshold * filterThreshold + delta
+        return dev // filter_threshold * filter_threshold + delta
 
-def drive(vel, u):
+def pd(k_p = 1, k_d = 0, vel = 88, delta = 0, filter_threshold = 0, dev_old = 0, l_value = read_percent(lSensor), r_value = read_percent(rSensor)):
+    dev = s_dev(l_value = l_value, r_value = r_value, delta = delta, filter_threshold = filter_threshold)
+    u = (k_p * dev) + (k_d * (dev - dev_old))
+
     lMotor.dc(vel + u)
     rMotor.dc(vel - u)
 
-def pdBody(kP = 1, kD = 0, delta = 0, filterThreshold = 0, lValue = lValue, rValue = rValue, devOld = devOld, dev = dev, u = u):
-    dev = sDev(lValue = lValue, rValue = rValue, delta = delta, filterThreshold = filterThreshold)
-    u = (kP * dev) + (kD * (dev - devOld))
-    devOld = dev
+    return dev
 
-    return u
+def pid(k_p = 1, k_d = 0, k_i = 0, vel = 88, delta = 0, filter_threshold = 0, dev_old = 0, i_sum = 0):
+    dev = s_dev(l_value = read_percent(lSensor), r_value = read_percent(rSensor), delta = delta, filter_threshold = filter_threshold)
+    u = (k_p * dev) + (k_d * (dev - dev_old)) + (k_i * i_sum)
 
-def pidBody(kP = 1, kD = 0, kI = 0, delta = 0, filterThreshold = 0, devOld = devOld, dev = dev, u = u, iSum = iSum):
-    dev = sDev(delta = 0, filterThreshold = filterThreshold)
-    iSum = iSum + dev
-    u = kP * dev + kD * (dev - devOld) + kI * iSum
-    
-    return u
+    lMotor.dc(vel + u)
+    rMotor.dc(vel - u)
 
-def pdInf(kP = 1, kD = 0, vel = 50, delta = 0, filterThreshold = 0):
-    resetValues()
+    i_sum += dev
+    return dev, i_sum
+
+def pd_inf(k_p = 1, k_d = 0, vel = 50, delta = 0, filter_threshold = 0):
+    dev_old = 0
 
     while True:
-        u = pdBody(kP = kP, kD = kD, delta = delta, filterThreshold = filterThreshold)
-        drive(vel, u)
+        dev_old = pd(k_p = k_p, k_d = k_d, vel = vel, delta = delta, filter_threshold = filter_threshold, dev_old = dev_old, l_value = read_percent(lSensor), r_value = read_percent(rSensor))
 
-def pd_1s(sensor, side = 'left', gray = 30, kP = 1, kD = 0, vel = 50, filterThreshold = 0):
-    sign = 0
-    if side == 'right':
-        sign = -1
-    elif side == 'left':
-        sign = 1
-    
-    resetValues()
+def pd_inf_accel(k_p = 1, k_d = 0, vel_start = 20, vel_target = 88, accel_angle = 200, delta = 0, filter_threshold = 0):
+    dev_old = 0
 
-    if sensor == lSensor:
-        rValue = gray
-    elif sensor == rSensor:
-        lValue = gray
+    vel = vel_start
+    delta_vel = vel_target - vel_start
 
     while True:
-        u = pdBody(kP = kP, kD = kD, delta = 0, filterThreshold = filterThreshold)
-        drive(vel, u)
+        if vel < vel_target:
+            vel = vel_start + delta_vel * (lMotor.angle() / accel_angle)
+        else:
+            vel = vel_target
 
-def pdEncoder(angle, kP = 1, kD = 0, vel = 50, delta = 0, filterThreshold = 0):
-    resetValues()
+        dev_old = pd(k_p = k_p, k_d = k_d, vel = vel, delta = delta, filter_threshold = filter_threshold, dev_old = dev_old, l_value = read_percent(lSensor), r_value = read_percent(rSensor))
+
+def pd_encoder(angle, k_p = 1, k_d = 0, vel = 50, delta = 0, filter_threshold = 0):
+    dev_old = 0
+    lMotor.reset_angle(0)
 
     while lMotor.angle() <= angle:
-        u = pdBody(kP = kP, kD = kD, delta = delta, filterThreshold = filterThreshold)
-        drive(vel, u)
+        dev_old = pd(k_p = k_p, k_d = k_d, vel = vel, delta = delta, filter_threshold = filter_threshold, dev_old = dev_old, l_value = read_percent(lSensor), r_value = read_percent(rSensor))
     
     lMotor.brake()
     rMotor.brake()
 
-def pdEncoderLog(angle, kP = 1, kD = 0, vel = 50, delta = 0, filterThreshold = 0):
-    resetValues()
+def pd_encoder_1s(angle, sensor = 'left', side = 'left', k_p = 1, k_d = 0, vel = 50, gray = 40, filter_threshold = 0):
+    dev_old = 0
+    lMotor.reset_angle(0)
+
+    if sensor == 'left':
+        if side == 'left':
+            while lMotor.angle() <= angle:
+                dev_old = pd(k_p = k_p, k_d = k_d, vel = vel, delta = 0, filter_threshold = filter_threshold, dev_old = dev_old, l_value = read_percent(lSensor), r_value = gray)
+        elif side == 'right':
+            while lMotor.angle() <= angle:
+                dev_old = pd(k_p = k_p, k_d = k_d, vel = vel, delta = 0, filter_threshold = filter_threshold, dev_old = dev_old, l_value = gray, r_value = read_percent(lSensor))
+    elif sensor == 'right':
+        if side == 'left':
+            while lMotor.angle() <= angle:
+                dev_old = pd(k_p = k_p, k_d = k_d, vel = vel, delta = 0, filter_threshold = filter_threshold, dev_old = dev_old, l_value = read_percent(rSensor), r_value = gray)
+        elif side == 'right':
+            while lMotor.angle() <= angle:
+                dev_old = pd(k_p = k_p, k_d = k_d, vel = vel, delta = 0, filter_threshold = filter_threshold, dev_old = dev_old, l_value = gray, r_value = read_percent(rSensor))
+
+    lMotor.brake()
+    rMotor.brake()
+
+def pd_crossings(count = 0, k_p = 1, k_d = 0, vel = 50, min_angle = 99, line_threshold = 24, delta = 0, filter_threshold = 0):
+    def body():
+        dev_old = 0
+        lMotor.reset_angle(0)
+
+        while (not(read_percent(lSensor) <= line_threshold and read_percent(rSensor) <= line_threshold)) or (lMotor.angle() <= min_angle):
+            dev_old = pd(k_p = k_p, k_d = k_d, vel = vel, delta = delta, filter_threshold = filter_threshold, dev_old = dev_old, l_value = read_percent(lSensor), r_value = read_percent(rSensor))
+    
+    if count <= 0:
+        while True:
+            body()
+    else:
+        for i in range (0, count):
+            body()
+
+    lMotor.brake()
+    rMotor.brake()
+
+def pd_crossings_accel(count = 0, k_p = 1, k_d = 0, vel_start = 20, vel_target = 88, accel_angle = 200, min_angle = 99, line_threshold = 24, delta = 0, filter_threshold = 0):
+    def body():
+        dev_old = 0
+        lMotor.reset_angle(0)
+
+        vel = vel_start
+        delta_vel = vel_target - vel_start
+
+        while (not(read_percent(lSensor) <= line_threshold and read_percent(rSensor) <= line_threshold)) or (lMotor.angle() <= min_angle):
+            if vel < vel_target:
+                vel = vel_start + delta_vel * (lMotor.angle() / accel_angle)
+            else:
+                vel = vel_target
+
+            dev_old = pd(k_p = k_p, k_d = k_d, vel = vel, delta = delta, filter_threshold = filter_threshold, dev_old = dev_old, l_value = read_percent(lSensor), r_value = read_percent(rSensor))
+    
+    if count <= 0:
+        while True:
+            body()
+    else:
+        for i in range (0, count):
+            body()
+
+    lMotor.brake()
+    rMotor.brake()
+
+def pid_alignment(time = 300, k_p = 1.5, k_d = 6, k_i = 0.004):
+    dev_old, i_sum = 0, 0
+
+    timer = StopWatch()
+    timer.resume()
+    timer.reset()
+
+    while timer.time() <= time:
+        dev_old, i_sum = pid(k_p = k_p, k_d = k_d, k_i = k_i, vel = 0, delta = 0, filter_threshold = 0, dev_old = dev_old, i_sum = i_sum)
+
+    lMotor.brake()
+    rMotor.brake()
+
+def l_turn(straight_angle = 200, time = 300, k_p = 1.5, k_d = 6, k_i = 0.004, white = 55, black = 14, straight_vel = 77, turn_vel = 66):
+    dev_old, i_sum = 0, 0
+    lMotor.reset_angle(0)
+
+    while lMotor.angle() <= straight_angle:
+        lMotor.dc(straight_vel)
+        rMotor.dc(straight_vel)
+
+    while not (read_percent(lSensor) >= white):
+        lMotor.dc(-turn_vel)
+        rMotor.dc(turn_vel)
+
+    while not (read_percent(lSensor) <= black):
+        lMotor.dc(-turn_vel)
+        rMotor.dc(turn_vel)
+
+    lMotor.brake()
+    rMotor.brake()
+
+    pid_alignment(time = time, k_p = k_p, k_d = k_d, k_i = k_i)
+
+def r_turn(straight_angle = 200, time = 300, k_p = 1.5, k_d = 6, k_i = 0.004, white = 55, black = 14, straight_vel = 77, turn_vel = 66):
+    dev_old, i_sum = 0, 0
+    lMotor.reset_angle(0)
+
+    while lMotor.angle() <= straight_angle:
+        lMotor.dc(straight_vel)
+        rMotor.dc(straight_vel)
+
+    while not (read_percent(rSensor) >= white):
+        lMotor.dc(turn_vel)
+        rMotor.dc(-turn_vel)
+
+    while not (read_percent(rSensor) <= black):
+        lMotor.dc(turn_vel)
+        rMotor.dc(-turn_vel)
+
+    lMotor.brake()
+    rMotor.brake()
+
+    pid_alignment(time = time, k_p = k_p, k_d = k_d, k_i = k_i)
+
+def pd_encoder_log(angle, k_p = 1, k_d = 0, vel = 50, delta = 0, filter_threshold = 0):
+    dev_old = 0
+    lMotor.reset_angle(0)
 
     data_l = []
     data_r = []
@@ -111,8 +219,7 @@ def pdEncoderLog(angle, kP = 1, kD = 0, vel = 50, delta = 0, filterThreshold = 0
         data_l.append(readPercent(sensor = lSensor))
         data_r.append(readPercent(sensor = rSensor))
 
-        u = pdBody(kP = kP, kD = kD, delta = delta, filterThreshold = filterThreshold)
-        drive(vel, u)
+        dev_old = pd(k_p = k_p, k_d = k_d, vel = vel, delta = delta, filter_threshold = filter_threshold, dev_old = dev_old, l_value = read_percent(lSensor), r_value = read_percent(rSensor))
 
     lMotor.brake()
     rMotor.brake()
@@ -122,129 +229,5 @@ def pdEncoderLog(angle, kP = 1, kD = 0, vel = 50, delta = 0, filterThreshold = 0
 
     for i in range (0, len(data_l)):
         log_l.log(data_l[i])
-    for i in range (0, len(data_r)):
         log_r.log(data_r[i])
-
-def pdEncoder_1s(angle, sensor, side = 'left', gray = 30, kP = 1, kD = 0, vel = 50):
-    sign = 0
-    if side == 'right':
-        sign = -1
-    elif side == 'left':
-        sign = 1
-    
-    resetValues()
-
-    if sensor == lSensor:
-        rValue = gray
-    elif sensor == rSensor:
-        lValue = gray
-
-    while lMotor.angle() <= angle:
-        u = pdBody(kP = kP, kD = kD, delta = 0, filterThreshold = filterThreshold)
-        drive(vel, u)
-
-    lMotor.brake()
-    rMotor.brake()
-
-def pdCrossings(count = 0, kP = 1, kD = 0, vel = 50, minAngle = 77, lineThreshold = 16, delta = 0, filterThreshold = 0):
-    def body():
-        resetValues()
-
-        while (not(readPercent(lSensor) <= lineThreshold and readPercent(rSensor) <= lineThreshold)) or (lMotor.angle() <= minAngle):
-            u = pdBody(kP = kP, kD = kD, delta = delta, filterThreshold = filterThreshold)
-            drive(vel, u)
-
-    if count <= 0:
-        while True:
-            body()
-    else:
-        for i in range (0, count):
-            body()
-
-    lMotor.brake()
-    rMotor.brake()
-
-def pidAlignment(time = 200, k = 1, kP = 1, kD = 0, kI = 0, filterThreshold = 0):
-    resetValues()
-
-    timer.resume()
-    timer.reset()
-
-    while timer.time() <= time:
-        u = pidBody(kP = kP, kD = kD, kI = kI, filterThreshold = filterThreshold)
-        drive(0, u * k)
-
-    lMotor.brake()
-    rMotor.brake()
-
-def lTurn(straightAngle = 200, time = 200, k = 1, kP = 1, kD = 0, kI = 0, white = 40, black = 18, straightVel = 77, turnVel = 66, filterThreshold = 0):
-    resetValues()
-
-    while lMotor.angle() <= straightAngle:
-        drive(straightVel, 0)
-
-    while not (readPercent(lSensor) >= white):
-        drive(0, -1 * turnVel)
-
-    while not (readPercent(lSensor) <= black):
-        drive(0, -1 * turnVel)
-
-    lMotor.brake()
-    rMotor.brake()
-
-    pidAlignment(time = time, k = k, kP = kP, kD = kD, kI = kI, filterThreshold = filterThreshold)
-
-def rTurn(straightAngle = 200, time = 200, k = 1, kP = 1, kD = 0, kI = 0, white = 40, black = 18, straightVel = 77, turnVel = 66, filterThreshold = 0):
-    resetValues()
-
-    while lMotor.angle() <= straightAngle:
-        drive(straightVel, 0)
-
-    while not (readPercent(rSensor) >= white):
-        drive(0, turnVel)
-
-    while not (readPercent(rSensor) <= black):
-        drive(0, turnVel)
-
-    lMotor.brake()
-    rMotor.brake()
-
-    pidAlignment(time = time, k = k, kP = kP, kD = kD, kI = kI, filterThreshold = filterThreshold)
-
-def pdInfAccel(kP = 1, kD = 0, velStart = 20, velTarget = 88, accelAngle = 200, delta = 0, filterThreshold = 0):
-    resetValues()
-
-    vel = velStart
-    dVel = velTarget - velStart
-
-    while True:
-        if vel < velTarget:
-            vel = velStart + (lMotor.angle() / accelAngle) * dVel
-        
-        u = pdBody(kP = kP, kD = kD, delta = delta, filterThreshold = filterThreshold)
-        drive(vel, u)
-
-def pdCrossingsAccel(count = 0, kP = 1, kD = 0, velStart = 20, velTarget = 88, accelAngle = 200, minAngle = 77, lineThreshold = 16, delta = 0, filterThreshold = 0):
-    def body():
-        resetValues()
-
-        vel = velStart
-        dVel = velTarget - velStart
-
-        while (not(readPercent(lSensor) <= lineThreshold and readPercent(rSensor) <= lineThreshold)) or (lMotor.angle() <= minAngle):
-            if vel < velTarget:
-                vel = velStart + (lMotor.angle() / accelAngle) * dVel
-            
-            u = pdBody(kP = kP, kD = kD, delta = delta, filterThreshold = filterThreshold)
-            drive(vel, u)
-
-    if count <= 0:
-        while True:
-            body()
-    else:
-        for i in range (0, count):
-            body()
-
-    lMotor.brake()
-    rMotor.brake()
 
