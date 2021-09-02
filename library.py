@@ -8,7 +8,7 @@ from pybricks.robotics import DriveBase
 from pybricks.media.ev3dev import SoundFile, ImageFile
 from pybricks.iodevices import Ev3devSensor
 
-lMotor = Motor(Port.B)
+lMotor = Motor(Port.B, positive_direction=Direction.COUNTERCLOCKWISE)
 rMotor = Motor(Port.C)
 
 lSensor = ColorSensor(Port.S1)
@@ -81,7 +81,7 @@ def pd_encoder(angle, k_p = 1, k_d = 0, vel = 50, delta = 0, filter_threshold = 
     dev_old = 0
     lMotor.reset_angle(0)
 
-    while lMotor.angle() <= angle:
+    while abs(lMotor.angle()) <= angle:
         dev_old = pd(k_p = k_p, k_d = k_d, vel = vel, delta = delta, filter_threshold = filter_threshold, dev_old = dev_old, l_value = read_percent(lSensor), r_value = read_percent(rSensor))
     
     lMotor.brake()
@@ -93,17 +93,17 @@ def pd_encoder_1s(angle, sensor = 'left', side = 'left', k_p = 1, k_d = 0, vel =
 
     if sensor == 'left':
         if side == 'left':
-            while lMotor.angle() <= angle:
+            while abs(lMotor.angle()) <= angle:
                 dev_old = pd(k_p = k_p, k_d = k_d, vel = vel, delta = 0, filter_threshold = filter_threshold, dev_old = dev_old, l_value = read_percent(lSensor), r_value = gray)
         elif side == 'right':
-            while lMotor.angle() <= angle:
+            while abs(lMotor.angle()) <= angle:
                 dev_old = pd(k_p = k_p, k_d = k_d, vel = vel, delta = 0, filter_threshold = filter_threshold, dev_old = dev_old, l_value = gray, r_value = read_percent(lSensor))
     elif sensor == 'right':
         if side == 'left':
-            while lMotor.angle() <= angle:
+            while abs(lMotor.angle()) <= angle:
                 dev_old = pd(k_p = k_p, k_d = k_d, vel = vel, delta = 0, filter_threshold = filter_threshold, dev_old = dev_old, l_value = read_percent(rSensor), r_value = gray)
         elif side == 'right':
-            while lMotor.angle() <= angle:
+            while abs(lMotor.angle()) <= angle:
                 dev_old = pd(k_p = k_p, k_d = k_d, vel = vel, delta = 0, filter_threshold = filter_threshold, dev_old = dev_old, l_value = gray, r_value = read_percent(rSensor))
 
     lMotor.brake()
@@ -114,7 +114,7 @@ def pd_crossings(count = 0, k_p = 1, k_d = 0, vel = 50, min_angle = 99, line_thr
         dev_old = 0
         lMotor.reset_angle(0)
 
-        while (not(read_percent(lSensor) <= line_threshold and read_percent(rSensor) <= line_threshold)) or (lMotor.angle() <= min_angle):
+        while (not(read_percent(lSensor) <= line_threshold and read_percent(rSensor) <= line_threshold)) or (abs(lMotor.angle()) <= min_angle):
             dev_old = pd(k_p = k_p, k_d = k_d, vel = vel, delta = delta, filter_threshold = filter_threshold, dev_old = dev_old, l_value = read_percent(lSensor), r_value = read_percent(rSensor))
     
     if count <= 0:
@@ -135,7 +135,7 @@ def pd_crossings_accel(count = 0, k_p = 1, k_d = 0, vel_start = 20, vel_target =
         vel = vel_start
         delta_vel = vel_target - vel_start
 
-        while (not(read_percent(lSensor) <= line_threshold and read_percent(rSensor) <= line_threshold)) or (lMotor.angle() <= min_angle):
+        while (not(read_percent(lSensor) <= line_threshold and read_percent(rSensor) <= line_threshold)) or (abs(lMotor.angle()) <= min_angle):
             if vel < vel_target:
                 vel = vel_start + delta_vel * (lMotor.angle() / accel_angle)
             else:
@@ -170,7 +170,7 @@ def l_turn(straight_angle = 200, time = 300, k_p = 1.5, k_d = 6, k_i = 0.004, wh
     dev_old, i_sum = 0, 0
     lMotor.reset_angle(0)
 
-    while lMotor.angle() <= straight_angle:
+    while abs(lMotor.angle()) <= straight_angle:
         lMotor.dc(straight_vel)
         rMotor.dc(straight_vel)
 
@@ -191,7 +191,7 @@ def r_turn(straight_angle = 200, time = 300, k_p = 1.5, k_d = 6, k_i = 0.004, wh
     dev_old, i_sum = 0, 0
     lMotor.reset_angle(0)
 
-    while lMotor.angle() <= straight_angle:
+    while abs(lMotor.angle()) <= straight_angle:
         lMotor.dc(straight_vel)
         rMotor.dc(straight_vel)
 
@@ -231,3 +231,100 @@ def pd_encoder_log(angle, k_p = 1, k_d = 0, vel = 50, delta = 0, filter_threshol
         log_l.log(data_l[i])
         log_r.log(data_r[i])
 
+# def pd_sync_infinite(vel_b = 50, vel_c = 50, k_p = 1, k_d = 5):
+#     dev_old = 0
+#     dev = 0
+#     u = 0
+#     lMotor.reset_angle(0)
+#     rMotor.reset_angle(0)
+
+#     while True:
+#         dev = rMotor.angle() * abs(vel_b / vel_c) - lMotor.angle()
+        
+#         u = k_p * dev + k_d * (dev - dev_old)
+
+#         lMotor.dc(vel_b + u)
+#         rMotor.dc(vel_c - u)
+
+#         dev_old = dev
+
+# def pd_sync_encoder(vel_b = 50, vel_c = 50, angle = 0, k_p = 1, k_d = 5):
+#     dev_old = 0
+#     dev = 0
+#     u = 0
+#     lMotor.reset_angle(0)
+#     rMotor.reset_angle(0)
+
+#     while (abs(lMotor.angle()) + abs(rMotor.angle())) / 2 <= abs(angle):
+#         dev = rMotor.angle() * abs(vel_b / vel_c) - lMotor.angle()
+
+#         u = k_p * dev + k_d * (dev - dev_old)
+
+#         lMotor.dc(vel_b + u)
+#         rMotor.dc(vel_c - u)
+
+#         dev_old = dev
+    
+#     lMotor.brake()
+#     rMotor.brake()
+
+# def pd_sync_arc(vel_b = 50, vel_c = 50, angle = 0, k_p = 1, k_d = 5):
+#     dev_old = 0
+#     dev = 0
+#     u = 0
+#     lMotor.reset_angle(0)
+#     rMotor.reset_angle(0)
+
+#     sign = abs(vel_b * vel_c - 1) - abs(vel_b * vel_c)
+
+#     if vel_c == 0:
+#         ratio = abs(vel_c / vel_b)
+#     else:
+#         ratio = abs(vel_b / vel_c)
+
+#     while (abs(lMotor.angle()) + abs(rMotor.angle())) / 2 <= abs(angle):
+#         dev = rMotor.angle() * ratio + lMotor.angle() * sign
+
+#         u = k_p * dev + k_d * (dev - dev_old)
+
+#         lMotor.dc(vel_b - u * sign)
+#         rMotor.dc(vel_c - u)
+
+#         dev_old = dev
+    
+#     lMotor.brake()
+#     rMotor.brake()
+
+def pd_sync_encoder(lVel = 50, rVel = 50, angle = 0, k_p = 1, k_d = 5):
+    dev_old = 0
+    dev = 0
+    u = 0
+    lMotor.reset_angle(0)
+    rMotor.reset_angle(0)
+
+    if lVel == 0:
+        rMotor.dc(rVel)
+        while abs(rMotor.angle()) <= abs(angle):
+            pass
+        rMotor.brake()
+    elif rVel == 0:
+        lMotor.dc(lVel)
+        while abs(lMotor.angle()) <= abs(angle):
+            pass
+        lMotor.brake()
+    else:
+        r_correction = abs(lVel / rVel)
+
+        l_sign = lVel // abs(lVel)
+        r_sign = rVel // abs(rVel)
+
+        while (abs(lMotor.angle()) + abs(rMotor.angle())) / 2 <= abs(angle):
+            dev = abs(rMotor.angle()) * r_correction - abs(lMotor.angle())
+            u = k_p * dev + k_d * (dev - dev_old)
+            dev_old = dev
+
+            lMotor.dc(lVel + u * l_sign)
+            rMotor.dc(rVel - u * r_sign)
+        
+        lMotor.brake()
+        rMotor.brake()
