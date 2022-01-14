@@ -14,7 +14,7 @@ from pybricks.iodevices import Ev3devSensor
 # Create your objects here.
 ev3 = EV3Brick()
 
-lMotor = Motor(Port.B)
+lMotor = Motor(Port.B, positirve_direction = Direction.COUNTERCLOCKWISE)
 rMotor = Motor(Port.C)
 
 lSensor = ColorSensor(Port.S1)
@@ -60,7 +60,7 @@ def pd_encoder(k_p = 1, k_d = 0, vel = 88, target_angle = 360, l_val = ls_map(),
     while (lMotor.angle() + rMotor.angle()) / 2 < target_angle:
         dev_old = pd(k_p = k_p, k_d = k_d, vel = vel, dev_old = dev_old, l_val = l_val, r_val = r_val)
 
-def pd_crossings(k_p = 1, k_d = 0, vel = 88, target_crossings = 1, control_angle = 90, black = 16, l_val = ls_map(), r_val = rs_map()):
+def pd_crossings(k_p = 1, k_d = 0, vel = 88, target_crossings = 1, control_angle = 90, threshold = 16, l_val = ls_map(), r_val = rs_map()):
     if target_crossings < 1:
         return 0
     
@@ -68,7 +68,7 @@ def pd_crossings(k_p = 1, k_d = 0, vel = 88, target_crossings = 1, control_angle
     
     for i in range(target_crossings):
         lMotor.reset_angle(0)
-        while ls_map() > black or rs_map() > black or lMotor.angle() < control_angle:
+        while ls_map() > threshold or rs_map() > threshold or lMotor.angle() < control_angle:
             dev_old = pd(k_p = k_p, k_d = k_d, vel = vel, dev_old = dev_old, l_val = l_val, r_val = r_val)
 
 def pd_encoder_acc(k_p = 1, k_d = 0, start_vel = 33, target_vel = 88, acc_angle = 200, target_angle = 360, l_val = ls_map(), r_val = rs_map()):
@@ -83,7 +83,7 @@ def pd_encoder_acc(k_p = 1, k_d = 0, start_vel = 33, target_vel = 88, acc_angle 
         vel = target_vel if vel >= target_vel else vel_start + d_vel * (lMotor.angle() / start_angle)
         dev_old = pd(k_p = k_p, k_d = k_d, vel = vel, dev_old = dev_old, l_val = l_val, r_val = r_val)
 
-def pd_crossings_acc(k_p = 1, k_d = 0, start_vel = 33, target_vel = 88, acc_angle = 200, target_crossings = 1, control_angle = 90, black = 16, l_val = ls_map(), r_val = rs_map()):
+def pd_crossings_acc(k_p = 1, k_d = 0, start_vel = 33, target_vel = 88, acc_angle = 200, target_crossings = 1, control_angle = 90, threshold = 16, l_val = ls_map(), r_val = rs_map()):
     vel = start_vel
     d_vel = target_vel - start_vel
     
@@ -94,7 +94,7 @@ def pd_crossings_acc(k_p = 1, k_d = 0, start_vel = 33, target_vel = 88, acc_angl
     
     for i in range(target_crossings):
         lMotor.reset_angle(0)
-        while ls_map() > black or rs_map() > black or lMotor.angle() < control_angle:
+        while ls_map() > threshold or rs_map() > threshold or lMotor.angle() < control_angle:
             vel = target_vel if vel >= target_vel else vel_start + d_vel * (lMotor.angle() / start_angle)
             dev_old = pd(k_p = k_p, k_d = k_d, vel = vel, dev_old = dev_old, l_val = l_val, r_val = r_val)
 
@@ -108,18 +108,106 @@ def pid_alignment(time = 200, k_p = 1, k_d = 0, k_i = 0, l_val = ls_map(), r_val
     while timer.time() < time:
         dev_old, i_sum = pid(k_p = k_p, k_d = k_d, k_i = k_i, vel = 0, dev_old = dev_old, i_sum = i_sum, l_val = l_val, r_val = r_val)
 
-def sync_arc(l_vel = 88, r_vel = 88, angle = 360, k_p = 1, k_d = 0):
-    ratio = r_vel / l_vel
-    lMotor.reset_angle(0)
-    rMotor.reset_angle(0)
-    dev_old = 0
+def sync_arc_enc(l_vel = 88, r_vel = 88, angle = 360, k_p = 1, k_d = 0):
+    if l_vel == 0:
+        if r_vel == 0:
+            pass
+        else:
+            rMotor.reset_angle(0)
+            while abs(rMotor.angle()) < angle:
+                rMotor.dc(r_vel)
+    elif r_vel == 0:
+        lMotor.reset_angle(0)
+        while abs(lMotor.angle()) < angle:
+            lMotor.dc(l_vel)
+    else:
+        ratio = r_vel / l_vel
+        k = abs(l_vel // abs(l_vel) - r_vel // abs(r_vel)) - 1
+        lMotor.reset_angle(0)
+        rMotor.reset_angle(0)
+        dev_old = 0
+        while (abs(lMotor.angle()) + abs(rMotor.angle())) / 2 < angle:
+            dev = rMotor.angle() - lMotor.angle() * ratio
+            st = k_p * dev + k_d * (dev - dev_old)
 
-    while (lMotor.angle() + rMotor.angle()) / 2 < angle:
-        dev = rMotor.angle() - lMotor.angle() * ratio
-        st = k_p * dev + k_d * (dev - dev_old)
-        lMotor.dc(l_vel + st)
-        rMotor.dc(r_vel - st)
-        dev_old = dev
+            lMotor.dc(l_vel - k * st)
+            rMotor.dc(r_vel - st)
+            dev_old = dev
+    
+def sync_arc_ls(l_vel = 88, r_vel = 88, threshold = 20, till_less_than = True, k_p = 1, k_d = 0):
+    sgn = 1 if till_less_than else -1
+    if l_vel == 0:
+        if r_vel == 0:
+            pass
+        else:
+            while sgn * ls_map() > sgn * threshold:
+                rMotor.dc(r_vel)
+    elif r_vel == 0:
+        while sgn * ls_map() > sgn * threshold:
+                lMotor.dc(l_vel)
+    else:
+        ratio = r_vel / l_vel
+        k = abs(l_vel // abs(l_vel) - r_vel // abs(r_vel)) - 1
+        lMotor.reset_angle(0)
+        rMotor.reset_angle(0)
+        dev_old = 0
+        while sgn * ls_map() > sgn * threshold:
+            dev = rMotor.angle() - lMotor.angle() * ratio
+            st = k_p * dev + k_d * (dev - dev_old)
+
+            lMotor.dc(l_vel - k * st)
+            rMotor.dc(r_vel - st)
+            dev_old = dev
+
+def sync_arc_rs(l_vel = 88, r_vel = 88, threshold = 20, till_less_than = True, k_p = 1, k_d = 0):
+    sgn = 1 if till_less_than else -1
+    if l_vel == 0:
+        if r_vel == 0:
+            pass
+        else:
+            while sgn * rs_map() > sgn * threshold:
+                rMotor.dc(r_vel)
+    elif r_vel == 0:
+        while sgn * rs_map() > sgn * threshold:
+                lMotor.dc(l_vel)
+    else:
+        ratio = r_vel / l_vel
+        k = abs(l_vel // abs(l_vel) - r_vel // abs(r_vel)) - 1
+        lMotor.reset_angle(0)
+        rMotor.reset_angle(0)
+        dev_old = 0
+        while sgn * rs_map() > sgn * threshold:
+            dev = rMotor.angle() - lMotor.angle() * ratio
+            st = k_p * dev + k_d * (dev - dev_old)
+
+            lMotor.dc(l_vel - k * st)
+            rMotor.dc(r_vel - st)
+            dev_old = dev
+
+def sync_arc_2s(l_vel = 88, r_vel = 88, threshold = 20, till_less_than = True, k_p = 1, k_d = 0):
+    sgn = 1 if till_less_than else -1
+    if l_vel == 0:
+        if r_vel == 0:
+            pass
+        else:
+            while (sgn * ls_map() > sgn * threshold) and (sgn * rs_map() > sgn * threshold):
+                rMotor.dc(r_vel)
+    elif r_vel == 0:
+        while (sgn * ls_map() > sgn * threshold) and (sgn * rs_map() > sgn * threshold):
+                lMotor.dc(l_vel)
+    else:
+        ratio = r_vel / l_vel
+        k = abs(l_vel // abs(l_vel) - r_vel // abs(r_vel)) - 1
+        lMotor.reset_angle(0)
+        rMotor.reset_angle(0)
+        dev_old = 0
+        while (sgn * ls_map() > sgn * threshold) and (sgn * rs_map() > sgn * threshold):
+            dev = rMotor.angle() - lMotor.angle() * ratio
+            st = k_p * dev + k_d * (dev - dev_old)
+
+            lMotor.dc(l_vel - k * st)
+            rMotor.dc(r_vel - st)
+            dev_old = dev
 
 def norm_rgb(data = [0] * 3, min = [0] * 3, max = [0] * 3, max_val = 255):
     out = []

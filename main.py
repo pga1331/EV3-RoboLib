@@ -15,7 +15,7 @@ from library import *
 # Create your objects here.
 ev3 = EV3Brick()
 
-lMotor = Motor(Port.B)
+lMotor = Motor(Port.B, positive_direction = Direction.COUNTERCLOCKWISE)
 rMotor = Motor(Port.C)
 
 lSensor = ColorSensor(Port.S1)
