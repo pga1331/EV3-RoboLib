@@ -60,6 +60,34 @@ def pd_encoder(k_p = 1, k_d = 0, vel = 88, target_angle = 360, l_val = ls_map(),
     while (lMotor.angle() + rMotor.angle()) / 2 < target_angle:
         dev_old = pd(k_p = k_p, k_d = k_d, vel = vel, dev_old = dev_old, l_val = l_val, r_val = r_val)
 
+def pd_encoder_1s(k_p = 1, k_d = 0, vel = 88, target_angle = 360, sensor = lSensor, line_is_left = True):
+    dev_old = 0
+    lMotor.reset_angle(0)
+    rMotor.reset_angle(0)
+
+    if line_is_left:
+        ls = False
+        rs = 'ls' if sensor == lSensor else 'rs'
+    else:
+        ls = 'ls' if sensor == lSensor else 'rs'
+        rs = False
+
+    while (lMotor.angle() + rMotor.angle()) / 2 < target_angle:
+        if ls:
+            if ls == 'ls':
+                while ls_map() > threshold or rs_map() > threshold or lMotor.angle() < control_angle:
+                    dev_old = pd(k_p = k_p, k_d = k_d, vel = vel, dev_old = dev_old, l_val = ls_map(), r_val = 50)
+            else:
+                while ls_map() > threshold or rs_map() > threshold or lMotor.angle() < control_angle:
+                    dev_old = pd(k_p = k_p, k_d = k_d, vel = vel, dev_old = dev_old, l_val = rs_map(), r_val = 50)
+        else:
+            if rs == 'ls':
+                while ls_map() > threshold or rs_map() > threshold or lMotor.angle() < control_angle:
+                    dev_old = pd(k_p = k_p, k_d = k_d, vel = vel, dev_old = dev_old, l_val = 50, r_val = ls_map())
+            else:
+                while ls_map() > threshold or rs_map() > threshold or lMotor.angle() < control_angle:
+                    dev_old = pd(k_p = k_p, k_d = k_d, vel = vel, dev_old = dev_old, l_val = 50, r_val = rs_map())
+
 def pd_crossings(k_p = 1, k_d = 0, vel = 88, target_crossings = 1, control_angle = 90, threshold = 16, l_val = ls_map(), r_val = rs_map()):
     if target_crossings < 1:
         return 0
@@ -70,6 +98,36 @@ def pd_crossings(k_p = 1, k_d = 0, vel = 88, target_crossings = 1, control_angle
         lMotor.reset_angle(0)
         while ls_map() > threshold or rs_map() > threshold or lMotor.angle() < control_angle:
             dev_old = pd(k_p = k_p, k_d = k_d, vel = vel, dev_old = dev_old, l_val = l_val, r_val = r_val)
+
+def pd_crossings_1s(k_p = 1, k_d = 0, vel = 88, target_crossings = 1, sensor = lSensor, line_is_left = True, control_angle = 90, threshold = 16):
+    if target_crossings < 1:
+        return 0
+    
+    dev_old = 0
+    
+    if line_is_left:
+        ls = False
+        rs = 'ls' if sensor == lSensor else 'rs'
+    else:
+        ls = 'ls' if sensor == lSensor else 'rs'
+        rs = False
+
+    for i in range(target_crossings):
+        lMotor.reset_angle(0)
+        if ls:
+            if ls == 'ls':
+                while ls_map() > threshold or rs_map() > threshold or lMotor.angle() < control_angle:
+                    dev_old = pd(k_p = k_p, k_d = k_d, vel = vel, dev_old = dev_old, l_val = ls_map(), r_val = 50)
+            else:
+                while ls_map() > threshold or rs_map() > threshold or lMotor.angle() < control_angle:
+                    dev_old = pd(k_p = k_p, k_d = k_d, vel = vel, dev_old = dev_old, l_val = rs_map(), r_val = 50)
+        else:
+            if rs == 'ls':
+                while ls_map() > threshold or rs_map() > threshold or lMotor.angle() < control_angle:
+                    dev_old = pd(k_p = k_p, k_d = k_d, vel = vel, dev_old = dev_old, l_val = 50, r_val = ls_map())
+            else:
+                while ls_map() > threshold or rs_map() > threshold or lMotor.angle() < control_angle:
+                    dev_old = pd(k_p = k_p, k_d = k_d, vel = vel, dev_old = dev_old, l_val = 50, r_val = rs_map())
 
 def pd_encoder_acc(k_p = 1, k_d = 0, start_vel = 33, target_vel = 88, acc_angle = 200, target_angle = 360, l_val = ls_map(), r_val = rs_map()):
     vel = start_vel
