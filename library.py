@@ -14,7 +14,7 @@ from pybricks.iodevices import Ev3devSensor
 # Create your objects here.
 ev3 = EV3Brick()
 
-lMotor = Motor(Port.B, positirve_direction = Direction.COUNTERCLOCKWISE)
+lMotor = Motor(Port.B, positive_direction = Direction.COUNTERCLOCKWISE)
 rMotor = Motor(Port.C)
 
 lSensor = ColorSensor(Port.S1)
