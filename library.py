@@ -52,13 +52,13 @@ def pid(k_p = 1, k_d = 0, k_i = 0, vel = 88, dev_old = 0, i_sum = 0, l_val = ls_
 
     return [dev, i_sum + dev]
 
-def pd_encoder(k_p = 1, k_d = 0, vel = 88, target_angle = 360, l_val = ls_map(), r_val = rs_map()):
+def pd_encoder(k_p = 1, k_d = 0, vel = 88, target_angle = 360):
     dev_old = 0
     lMotor.reset_angle(0)
     rMotor.reset_angle(0)
 
     while (lMotor.angle() + rMotor.angle()) / 2 < target_angle:
-        dev_old = pd(k_p = k_p, k_d = k_d, vel = vel, dev_old = dev_old, l_val = l_val, r_val = r_val)
+        dev_old = pd(k_p = k_p, k_d = k_d, vel = vel, dev_old = dev_old, l_val = ls_map(), r_val = rs_map())
 
 def pd_encoder_1s(k_p = 1, k_d = 0, vel = 88, target_angle = 360, sensor = lSensor, line_is_left = True):
     dev_old = 0
@@ -88,7 +88,7 @@ def pd_encoder_1s(k_p = 1, k_d = 0, vel = 88, target_angle = 360, sensor = lSens
                 while ls_map() > threshold or rs_map() > threshold or lMotor.angle() < control_angle:
                     dev_old = pd(k_p = k_p, k_d = k_d, vel = vel, dev_old = dev_old, l_val = 50, r_val = rs_map())
 
-def pd_crossings(k_p = 1, k_d = 0, vel = 88, target_crossings = 1, control_angle = 90, threshold = 16, l_val = ls_map(), r_val = rs_map()):
+def pd_crossings(k_p = 1, k_d = 0, vel = 88, target_crossings = 1, control_angle = 90, threshold = 16):
     if target_crossings < 1:
         return 0
     
@@ -97,7 +97,7 @@ def pd_crossings(k_p = 1, k_d = 0, vel = 88, target_crossings = 1, control_angle
     for i in range(target_crossings):
         lMotor.reset_angle(0)
         while ls_map() > threshold or rs_map() > threshold or lMotor.angle() < control_angle:
-            dev_old = pd(k_p = k_p, k_d = k_d, vel = vel, dev_old = dev_old, l_val = l_val, r_val = r_val)
+            dev_old = pd(k_p = k_p, k_d = k_d, vel = vel, dev_old = dev_old, l_val = ls_map(), r_val = rs_map())
 
 def pd_crossings_1s(k_p = 1, k_d = 0, vel = 88, target_crossings = 1, sensor = lSensor, line_is_left = True, control_angle = 90, threshold = 16):
     if target_crossings < 1:
@@ -129,7 +129,7 @@ def pd_crossings_1s(k_p = 1, k_d = 0, vel = 88, target_crossings = 1, sensor = l
                 while ls_map() > threshold or rs_map() > threshold or lMotor.angle() < control_angle:
                     dev_old = pd(k_p = k_p, k_d = k_d, vel = vel, dev_old = dev_old, l_val = 50, r_val = rs_map())
 
-def pd_encoder_acc(k_p = 1, k_d = 0, start_vel = 33, target_vel = 88, acc_angle = 200, target_angle = 360, l_val = ls_map(), r_val = rs_map()):
+def pd_encoder_acc(k_p = 1, k_d = 0, start_vel = 33, target_vel = 88, acc_angle = 200, target_angle = 360):
     vel = start_vel
     d_vel = target_vel - start_vel
 
@@ -139,9 +139,9 @@ def pd_encoder_acc(k_p = 1, k_d = 0, start_vel = 33, target_vel = 88, acc_angle 
 
     while (lMotor.angle() + rMotor.angle()) / 2 < target_angle:
         vel = target_vel if vel >= target_vel else vel_start + d_vel * (lMotor.angle() / start_angle)
-        dev_old = pd(k_p = k_p, k_d = k_d, vel = vel, dev_old = dev_old, l_val = l_val, r_val = r_val)
+        dev_old = pd(k_p = k_p, k_d = k_d, vel = vel, dev_old = dev_old, l_val = ls_map(), r_val = rs_map())
 
-def pd_crossings_acc(k_p = 1, k_d = 0, start_vel = 33, target_vel = 88, acc_angle = 200, target_crossings = 1, control_angle = 90, threshold = 16, l_val = ls_map(), r_val = rs_map()):
+def pd_crossings_acc(k_p = 1, k_d = 0, start_vel = 33, target_vel = 88, acc_angle = 200, target_crossings = 1, control_angle = 90, threshold = 16):
     vel = start_vel
     d_vel = target_vel - start_vel
     
@@ -154,7 +154,7 @@ def pd_crossings_acc(k_p = 1, k_d = 0, start_vel = 33, target_vel = 88, acc_angl
         lMotor.reset_angle(0)
         while ls_map() > threshold or rs_map() > threshold or lMotor.angle() < control_angle:
             vel = target_vel if vel >= target_vel else vel_start + d_vel * (lMotor.angle() / start_angle)
-            dev_old = pd(k_p = k_p, k_d = k_d, vel = vel, dev_old = dev_old, l_val = l_val, r_val = r_val)
+            dev_old = pd(k_p = k_p, k_d = k_d, vel = vel, dev_old = dev_old, l_val = ls_map(), r_val = rs_map())
 
 def pid_alignment(time = 200, k_p = 1, k_d = 0, k_i = 0, l_val = ls_map(), r_val = rs_map()):
     timer = StopWatch()
