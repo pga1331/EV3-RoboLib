@@ -46,6 +46,9 @@ line_k_p = 0.36
 line_k_d = 2
 line_k_i = 0
 
+line_threshold = 22
+ctrl_angle = 60
+
 sound_duration = 150
 delay_time = 150
 
